@@ -49,7 +49,13 @@ async function fetchMeetingTranscript(firefliesId, apiKey) {
         const sentences = transcriptData.sentences || [];
         const text = sentences.map(s => `${s.speaker_name}: ${s.text}`).join('\n');
 
-        return { sentences, text };
+        return {
+            sentences,
+            text,
+            title: transcriptData.title,
+            duration: transcriptData.duration,
+            date: transcriptData.date,
+        };
 
     } catch (error) {
         console.error(`Erro ao buscar na API do Fireflies:`, error.response?.data || error.message);

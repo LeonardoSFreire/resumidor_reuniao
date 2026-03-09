@@ -24,10 +24,12 @@ app.get('/health', (req, res) => {
 
 app.post('/api/webhooks/fireflies/:user_secret', async (req, res) => {
   const { user_secret } = req.params;
-  const { id: firefliesMeetingId, title, duration, date } = req.body;
+  const { meetingId } = req.body;
 
-  if (!firefliesMeetingId) {
-    return res.status(400).json({ error: 'firefliesMeetingId é obrigatório' });
+  console.log('Webhook recebido:', JSON.stringify(req.body));
+
+  if (!meetingId) {
+    return res.status(400).json({ error: 'meetingId é obrigatório' });
   }
 
   try {
@@ -54,7 +56,7 @@ app.post('/api/webhooks/fireflies/:user_secret', async (req, res) => {
     res.status(202).json({ message: 'Webhook recebido, processamento iniciado assincronamente.' });
 
     // 2. Processar a reunião assincronamente
-    processMeeting(firefliesMeetingId, userId, openai_api_key, fireflies_api_key, { title, duration, date }).catch(err => {
+    processMeeting(meetingId, userId, openai_api_key, fireflies_api_key).catch(err => {
       console.error('Erro no processAssync:', err);
     });
 
@@ -66,17 +68,21 @@ app.post('/api/webhooks/fireflies/:user_secret', async (req, res) => {
   }
 });
 
-async function processMeeting(firefliesId, userId, openAiKey, firefliesApiKey, metadata) {
+async function processMeeting(firefliesId, userId, openAiKey, firefliesApiKey) {
   console.log(`Processando reunião ${firefliesId} para o usuário ${userId}`);
 
-  // A. Salva metadados brutos usando a RPC (Bypass RLS para o servidor)
+  // A. Buscar transcrição e metadados do Fireflies
+  const transcriptData = await fetchMeetingTranscript(firefliesId, firefliesApiKey);
+  if (!transcriptData) throw new Error("Transcrição não encontrada.");
+
+  // B. Salvar metadados iniciais com status "processing"
   const { data: meetingRecordId, error: insertError } = await supabase
     .rpc('process_webhook_meeting', {
       p_user_id: userId,
       p_fireflies_id: firefliesId,
-      p_title: metadata.title || 'Reunião Importada',
-      p_date: metadata.date || new Date().toISOString(),
-      p_duration: metadata.duration || 0,
+      p_title: transcriptData.title || 'Reunião Importada',
+      p_date: transcriptData.date ? new Date(transcriptData.date).toISOString() : new Date().toISOString(),
+      p_duration: transcriptData.duration || 0,
       p_meeting_type: null,
       p_objective: null,
       p_executive_summary: null,
@@ -92,18 +98,16 @@ async function processMeeting(firefliesId, userId, openAiKey, firefliesApiKey, m
   }
 
   try {
-    const transcriptData = await fetchMeetingTranscript(firefliesId, firefliesApiKey);
-    if (!transcriptData) throw new Error("Transcrição não encontrada.");
-
+    // C. Analisar com OpenAI
     const analysis = await analyzeTranscript(transcriptData.text, openAiKey);
 
-    // D. Atualiza o status completo via RPC
+    // D. Atualizar com resultado completo
     await supabase.rpc('process_webhook_meeting', {
       p_user_id: userId,
       p_fireflies_id: firefliesId,
-      p_title: metadata.title || 'Reunião Importada',
-      p_date: metadata.date || new Date().toISOString(),
-      p_duration: metadata.duration || 0,
+      p_title: transcriptData.title || 'Reunião Importada',
+      p_date: transcriptData.date ? new Date(transcriptData.date).toISOString() : new Date().toISOString(),
+      p_duration: transcriptData.duration || 0,
       p_meeting_type: analysis.tipo_reuniao,
       p_objective: analysis.objetivo,
       p_executive_summary: analysis.resumo_executivo,
@@ -120,9 +124,9 @@ async function processMeeting(firefliesId, userId, openAiKey, firefliesApiKey, m
       await supabase.rpc('process_webhook_meeting', {
         p_user_id: userId,
         p_fireflies_id: firefliesId,
-        p_title: metadata.title || 'Reunião Importada',
-        p_date: metadata.date || new Date().toISOString(),
-        p_duration: metadata.duration || 0,
+        p_title: transcriptData.title || 'Reunião Importada',
+        p_date: transcriptData.date ? new Date(transcriptData.date).toISOString() : new Date().toISOString(),
+        p_duration: transcriptData.duration || 0,
         p_meeting_type: null,
         p_objective: null,
         p_executive_summary: null,

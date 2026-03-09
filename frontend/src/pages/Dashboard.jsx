@@ -1,20 +1,26 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Search, Calendar as CalendarIcon, ChevronDown, Clock } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { Search, Calendar as CalendarIcon, ChevronDown, Clock, Send, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 
 export default function Dashboard() {
+    const { user } = useAuth();
     const [meetings, setMeetings] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [manualId, setManualId] = useState('');
+    const [processing, setProcessing] = useState(false);
+    const [processMessage, setProcessMessage] = useState(null);
     const navigate = useNavigate();
+
+    const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
     useEffect(() => {
         fetchMeetings();
     }, []);
 
     async function fetchMeetings() {
-        // Pegar ID e carregar
         const { data, error } = await supabase
             .from('meetings')
             .select('*')
@@ -24,6 +30,52 @@ export default function Dashboard() {
             setMeetings(data);
         }
         setLoading(false);
+    }
+
+    async function handleManualProcess(e) {
+        e.preventDefault();
+        if (!manualId.trim()) return;
+
+        setProcessing(true);
+        setProcessMessage(null);
+
+        try {
+            // Buscar o webhook secret do perfil do usuário
+            const { data: profile, error: profileError } = await supabase
+                .from('profiles')
+                .select('fireflies_webhook_secret')
+                .eq('id', user.id)
+                .single();
+
+            if (profileError || !profile?.fireflies_webhook_secret) {
+                setProcessMessage({ type: 'error', text: 'Webhook secret não encontrado. Verifique seu perfil.' });
+                setProcessing(false);
+                return;
+            }
+
+            const webhookUrl = `${backendUrl}/api/webhooks/fireflies/${profile.fireflies_webhook_secret}`;
+
+            const response = await fetch(webhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ meetingId: manualId.trim() }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                setProcessMessage({ type: 'success', text: 'Reunião enviada para processamento! Aguarde alguns segundos e atualize a página.' });
+                setManualId('');
+                // Recarrega as reuniões após alguns segundos
+                setTimeout(() => fetchMeetings(), 8000);
+            } else {
+                setProcessMessage({ type: 'error', text: data.error || 'Erro ao processar reunião.' });
+            }
+        } catch (err) {
+            setProcessMessage({ type: 'error', text: 'Erro de conexão com o backend: ' + err.message });
+        }
+
+        setProcessing(false);
     }
 
     const getBadgeColor = (type) => {
@@ -71,6 +123,34 @@ export default function Dashboard() {
                         Meeting Type <ChevronDown className="ml-2 h-4 w-4" />
                     </button>
                 </div>
+            </div>
+
+            {/* Processar reunião manualmente */}
+            <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm mb-6">
+                <h2 className="text-sm font-semibold text-gray-700 mb-3">Processar reunião por ID do Fireflies</h2>
+                <form onSubmit={handleManualProcess} className="flex items-center gap-3">
+                    <input
+                        type="text"
+                        value={manualId}
+                        onChange={(e) => setManualId(e.target.value)}
+                        placeholder="Cole o Meeting ID do Fireflies aqui..."
+                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-blue-500 focus:border-blue-500"
+                        disabled={processing}
+                    />
+                    <button
+                        type="submit"
+                        disabled={processing || !manualId.trim()}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+                    >
+                        {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                        {processing ? 'Processando...' : 'Processar'}
+                    </button>
+                </form>
+                {processMessage && (
+                    <p className={`mt-3 text-sm ${processMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                        {processMessage.text}
+                    </p>
+                )}
             </div>
 
             {/* Loading state */}
