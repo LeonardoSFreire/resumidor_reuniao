@@ -1,10 +1,8 @@
 const axios = require('axios');
 
-async function fetchMeetingTranscript(firefliesId) {
-    // Configurado com a chave que o dono do sistema SaaS vai colocar no .env GLOBAL.
-    const apiKey = process.env.FIREFLIES_API_KEY;
+async function fetchMeetingTranscript(firefliesId, apiKey) {
     if (!apiKey) {
-        throw new Error("FIREFLIES_API_KEY global não configurada no servidor.");
+        throw new Error("Fireflies API Key não fornecida.");
     }
 
     // GraphQL query padrão fornecida pelo Fireflies v2

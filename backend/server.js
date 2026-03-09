@@ -39,17 +39,22 @@ app.post('/api/webhooks/fireflies/:user_secret', async (req, res) => {
       return res.status(401).json({ error: 'Webhook Secret Inválido ou Usuário não encontrado.' });
     }
 
-    const { id: userId, openai_api_key } = profile[0];
+    const { id: userId, openai_api_key, fireflies_api_key } = profile[0];
 
     if (!openai_api_key) {
       console.error(`Usuário ${userId} não configurou a OpenAI API Key.`);
       return res.status(400).json({ error: 'OpenAI API Key não configurada para este usuário.' });
     }
 
+    if (!fireflies_api_key) {
+      console.error(`Usuário ${userId} não configurou a Fireflies API Key.`);
+      return res.status(400).json({ error: 'Fireflies API Key não configurada para este usuário.' });
+    }
+
     res.status(202).json({ message: 'Webhook recebido, processamento iniciado assincronamente.' });
 
     // 2. Processar a reunião assincronamente
-    processMeeting(firefliesMeetingId, userId, openai_api_key, { title, duration, date }).catch(err => {
+    processMeeting(firefliesMeetingId, userId, openai_api_key, fireflies_api_key, { title, duration, date }).catch(err => {
       console.error('Erro no processAssync:', err);
     });
 
@@ -61,7 +66,7 @@ app.post('/api/webhooks/fireflies/:user_secret', async (req, res) => {
   }
 });
 
-async function processMeeting(firefliesId, userId, openAiKey, metadata) {
+async function processMeeting(firefliesId, userId, openAiKey, firefliesApiKey, metadata) {
   console.log(`Processando reunião ${firefliesId} para o usuário ${userId}`);
 
   // A. Salva metadados brutos usando a RPC (Bypass RLS para o servidor)
@@ -87,7 +92,7 @@ async function processMeeting(firefliesId, userId, openAiKey, metadata) {
   }
 
   try {
-    const transcriptData = await fetchMeetingTranscript(firefliesId);
+    const transcriptData = await fetchMeetingTranscript(firefliesId, firefliesApiKey);
     if (!transcriptData) throw new Error("Transcrição não encontrada.");
 
     const analysis = await analyzeTranscript(transcriptData.text, openAiKey);
