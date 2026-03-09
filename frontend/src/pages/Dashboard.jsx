@@ -4,6 +4,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { Search, Calendar as CalendarIcon, ChevronDown, Clock, Send, Loader2, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
+import Toast from '../components/Toast';
+import ConfirmModal from '../components/ConfirmModal';
 
 export default function Dashboard() {
     const { user } = useAuth();
@@ -12,6 +14,8 @@ export default function Dashboard() {
     const [manualId, setManualId] = useState('');
     const [processing, setProcessing] = useState(false);
     const [processMessage, setProcessMessage] = useState(null);
+    const [toast, setToast] = useState(null);
+    const [deleteModal, setDeleteModal] = useState(null);
     const navigate = useNavigate();
 
     const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
@@ -40,7 +44,6 @@ export default function Dashboard() {
         setProcessMessage(null);
 
         try {
-            // Buscar o webhook secret do perfil do usuário
             const { data: profile, error: profileError } = await supabase
                 .from('profiles')
                 .select('fireflies_webhook_secret')
@@ -66,7 +69,6 @@ export default function Dashboard() {
             if (response.ok) {
                 setProcessMessage({ type: 'success', text: 'Reunião enviada para processamento! Aguarde alguns segundos e atualize a página.' });
                 setManualId('');
-                // Recarrega as reuniões após alguns segundos
                 setTimeout(() => fetchMeetings(), 8000);
             } else {
                 setProcessMessage({ type: 'error', text: data.error || 'Erro ao processar reunião.' });
@@ -78,9 +80,15 @@ export default function Dashboard() {
         setProcessing(false);
     }
 
-    async function handleDelete(e, meetingId) {
+    function handleDeleteClick(e, meetingId, title) {
         e.stopPropagation();
-        if (!confirm('Tem certeza que deseja excluir esta reunião?')) return;
+        setDeleteModal({ id: meetingId, title });
+    }
+
+    async function confirmDelete() {
+        if (!deleteModal) return;
+        const { id: meetingId } = deleteModal;
+        setDeleteModal(null);
 
         const { error } = await supabase
             .from('meetings')
@@ -89,8 +97,9 @@ export default function Dashboard() {
 
         if (!error) {
             setMeetings(prev => prev.filter(m => m.id !== meetingId));
+            setToast({ message: 'Reunião excluída com sucesso!', type: 'success' });
         } else {
-            alert('Erro ao excluir: ' + error.message);
+            setToast({ message: 'Erro ao excluir: ' + error.message, type: 'error' });
         }
     }
 
@@ -114,12 +123,32 @@ export default function Dashboard() {
     };
 
     return (
-        <div className="p-10 max-w-5xl">
+        <div className="p-4 md:p-10 max-w-5xl">
+            {toast && (
+                <Toast
+                    message={toast.message}
+                    type={toast.type}
+                    onClose={() => setToast(null)}
+                />
+            )}
+
+            {deleteModal && (
+                <ConfirmModal
+                    title="Excluir reunião"
+                    message={`Tem certeza que deseja excluir "${deleteModal.title}"? Esta ação não pode ser desfeita.`}
+                    confirmText="Excluir"
+                    cancelText="Cancelar"
+                    danger
+                    onConfirm={confirmDelete}
+                    onCancel={() => setDeleteModal(null)}
+                />
+            )}
+
             {/* Header Area */}
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-8">
                 <h1 className="text-3xl font-extrabold text-gray-900 mb-4 md:mb-0">Painel de Reuniões</h1>
 
-                <div className="flex items-center space-x-3">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                     <div className="relative">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <Search className="h-5 w-5 text-gray-400" />
@@ -131,20 +160,22 @@ export default function Dashboard() {
                         />
                     </div>
 
-                    <button className="flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        <CalendarIcon className="mr-2 h-4 w-4" /> Data
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <button className="flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            <CalendarIcon className="mr-2 h-4 w-4" /> Data
+                        </button>
 
-                    <button className="flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        Tipo de Reunião <ChevronDown className="ml-2 h-4 w-4" />
-                    </button>
+                        <button className="flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            Tipo de Reunião <ChevronDown className="ml-2 h-4 w-4" />
+                        </button>
+                    </div>
                 </div>
             </div>
 
             {/* Processar reunião manualmente */}
             <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm mb-6">
                 <h2 className="text-sm font-semibold text-gray-700 mb-3">Processar reunião por ID do Fireflies</h2>
-                <form onSubmit={handleManualProcess} className="flex items-center gap-3">
+                <form onSubmit={handleManualProcess} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                     <input
                         type="text"
                         value={manualId}
@@ -156,7 +187,7 @@ export default function Dashboard() {
                     <button
                         type="submit"
                         disabled={processing || !manualId.trim()}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+                        className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
                     >
                         {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                         {processing ? 'Processando...' : 'Processar'}
@@ -175,7 +206,6 @@ export default function Dashboard() {
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
                 </div>
             ) : (
-                /* Meeting List */
                 <div className="space-y-4">
                     {meetings.length === 0 ? (
                         <div className="text-center py-20 text-gray-500 bg-gray-50 rounded-lg border border-gray-200">
@@ -191,7 +221,7 @@ export default function Dashboard() {
                                 <div className="flex justify-between items-start mb-2">
                                     <h3 className="text-lg font-bold text-gray-900">{m.title}</h3>
                                     <button
-                                        onClick={(e) => handleDelete(e, m.id)}
+                                        onClick={(e) => handleDeleteClick(e, m.id, m.title)}
                                         className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition"
                                         title="Excluir reunião"
                                     >

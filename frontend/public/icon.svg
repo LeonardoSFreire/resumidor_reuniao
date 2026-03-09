@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" rx="96" fill="#2c5282"/>
+  <g transform="translate(256, 256)" stroke="white" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <!-- Brain outline - left hemisphere -->
+    <path d="M-8,-80 C-8,-80 -72,-80 -88,-40 C-104,0 -80,24 -80,24 C-80,24 -104,40 -96,72 C-88,104 -56,112 -56,112 C-56,112 -64,136 -40,152 C-16,168 -8,152 -8,152"/>
+    <!-- Brain outline - right hemisphere -->
+    <path d="M8,-80 C8,-80 72,-80 88,-40 C104,0 80,24 80,24 C80,24 104,40 96,72 C88,104 56,112 56,112 C56,112 64,136 40,152 C16,168 8,152 8,152"/>
+    <!-- Center line -->
+    <line x1="0" y1="-80" x2="0" y2="152"/>
+    <!-- Brain folds left -->
+    <path d="M0,-40 C0,-40 -48,-32 -64,-8"/>
+    <path d="M0,24 C0,24 -56,32 -72,64"/>
+    <path d="M0,88 C0,88 -40,96 -48,120"/>
+    <!-- Brain folds right -->
+    <path d="M0,-40 C0,-40 48,-32 64,-8"/>
+    <path d="M0,24 C0,24 56,32 72,64"/>
+    <path d="M0,88 C0,88 40,96 48,120"/>
+  </g>
+</svg>

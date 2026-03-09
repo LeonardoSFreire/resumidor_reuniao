@@ -31,9 +31,9 @@ export default function MeetingDetails() {
     if (!meeting) return <div className="p-10 text-center text-red-500">Reunião não encontrada.</div>;
 
     return (
-        <div className="flex flex-col h-screen bg-gray-50">
+        <div className="flex flex-col min-h-screen lg:h-screen bg-gray-50">
             {/* Header */}
-            <header className="bg-[#1e293b] text-white px-6 py-4 flex items-center justify-between shrink-0">
+            <header className="bg-[#1e293b] text-white px-4 lg:px-6 py-4 flex flex-wrap items-center justify-between shrink-0 gap-2">
                 <button
                     onClick={() => navigate('/dashboard')}
                     className="flex items-center space-x-2 text-sm font-medium text-gray-300 hover:text-white bg-[#0f172a] px-3 py-1.5 rounded border border-gray-700 transition"
@@ -42,11 +42,11 @@ export default function MeetingDetails() {
                     <span>Voltar</span>
                 </button>
 
-                <h1 className="text-xl font-semibold absolute left-1/2 -translate-x-1/2">
+                <h1 className="text-lg lg:text-xl font-semibold order-last w-full text-center lg:order-none lg:w-auto lg:absolute lg:left-1/2 lg:-translate-x-1/2">
                     Detalhes da Reunião
                 </h1>
 
-                <div className="flex items-center space-x-4 text-sm font-medium">
+                <div className="hidden lg:flex items-center space-x-4 text-sm font-medium">
                     <span className="text-gray-300">
                         {meeting.date ? format(parseISO(meeting.date), "d 'de' MMMM, yyyy", { locale: ptBR }) : ''}
                     </span>
@@ -59,10 +59,10 @@ export default function MeetingDetails() {
             </header>
 
             {/* Main Content: Duas Colunas */}
-            <div className="flex-1 flex overflow-hidden p-6 gap-6">
+            <div className="flex-1 flex flex-col lg:flex-row overflow-hidden p-4 lg:p-6 gap-6">
 
                 {/* Left Column: AI Analysis */}
-                <div className="w-1/2 flex flex-col overflow-y-auto pr-2 space-y-4 pb-20">
+                <div className="w-full lg:w-1/2 flex flex-col overflow-y-auto pr-0 lg:pr-2 space-y-4 pb-20">
                     <h2 className="text-2xl font-bold text-gray-900 mb-2">Análise da IA</h2>
 
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
@@ -102,7 +102,7 @@ export default function MeetingDetails() {
                 </div>
 
                 {/* Right Column: Full Transcript */}
-                <div className="w-1/2 flex flex-col h-full bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div className="w-full lg:w-1/2 flex flex-col h-[500px] lg:h-full bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                     <div className="px-6 py-4 border-b border-gray-200 bg-gray-50/50">
                         <h2 className="text-xl font-bold text-gray-900">Transcrição Completa</h2>
                     </div>

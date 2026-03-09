@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { KeyRound, ShieldAlert, Copy, CheckCircle, Flame } from 'lucide-react';
+import Toast from '../components/Toast';
 
 export default function Settings() {
     const { user } = useAuth();
@@ -11,6 +12,7 @@ export default function Settings() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [toast, setToast] = useState(null);
 
     // URL base do backend para gerar o link do Webhook
     const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
@@ -48,9 +50,9 @@ export default function Settings() {
 
         setSaving(false);
         if (!error) {
-            alert("Configurações salvas com sucesso!");
+            setToast({ message: 'Configurações salvas com sucesso!', type: 'success' });
         } else {
-            alert("Erro ao salvar: " + error.message);
+            setToast({ message: 'Erro ao salvar: ' + error.message, type: 'error' });
         }
     };
 
@@ -63,7 +65,14 @@ export default function Settings() {
     if (loading) return <div className="p-10">Carregando...</div>;
 
     return (
-        <div className="p-10 max-w-4xl">
+        <div className="p-4 md:p-10 max-w-4xl">
+            {toast && (
+                <Toast
+                    message={toast.message}
+                    type={toast.type}
+                    onClose={() => setToast(null)}
+                />
+            )}
             <h1 className="text-3xl font-extrabold text-gray-900 mb-8">Configurações</h1>
 
             <form onSubmit={handleSave}>
@@ -139,13 +148,13 @@ export default function Settings() {
                         <input
                             type="text"
                             readOnly
-                            className="flex-1 bg-transparent px-4 py-2 text-sm text-gray-600 font-mono focus:outline-none"
+                            className="flex-1 bg-transparent px-4 py-2 text-xs sm:text-sm text-gray-600 font-mono focus:outline-none min-w-0"
                             value={`${webhookBaseUrl}${profile?.fireflies_webhook_secret || 'GERANDO...'}`}
                         />
                         <button
                             type="button"
                             onClick={copyToClipboard}
-                            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 transition flex items-center border-l border-gray-300"
+                            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 transition flex items-center border-l border-gray-300 shrink-0"
                         >
                             {copied ? <CheckCircle className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
                         </button>
