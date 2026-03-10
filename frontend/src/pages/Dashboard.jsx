@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Search, Calendar as CalendarIcon, ChevronDown, Clock, Send, Loader2, Trash2 } from 'lucide-react';
+import { Search, Calendar as CalendarIcon, ChevronDown, Clock, Send, Loader2, Trash2, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import Toast from '../components/Toast';
@@ -16,6 +16,7 @@ export default function Dashboard() {
     const [processMessage, setProcessMessage] = useState(null);
     const [toast, setToast] = useState(null);
     const [deleteModal, setDeleteModal] = useState(null);
+    const [reprocessing, setReprocessing] = useState(null);
     const navigate = useNavigate();
 
     const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
@@ -101,6 +102,50 @@ export default function Dashboard() {
         } else {
             setToast({ message: 'Erro ao excluir: ' + error.message, type: 'error' });
         }
+    }
+
+    async function handleReprocess(e, meeting) {
+        e.stopPropagation();
+        if (reprocessing) return;
+
+        const firefliesId = meeting.fireflies_id;
+        if (!firefliesId) {
+            setToast({ message: 'Esta reunião não possui ID do Fireflies para reprocessar.', type: 'error' });
+            return;
+        }
+
+        setReprocessing(meeting.id);
+        try {
+            const { data: profile, error: profileError } = await supabase
+                .from('profiles')
+                .select('fireflies_webhook_secret')
+                .eq('id', user.id)
+                .single();
+
+            if (profileError || !profile?.fireflies_webhook_secret) {
+                setToast({ message: 'Webhook secret não encontrado. Verifique seu perfil.', type: 'error' });
+                setReprocessing(null);
+                return;
+            }
+
+            const webhookUrl = `${backendUrl}/api/webhooks/fireflies/${profile.fireflies_webhook_secret}`;
+            const response = await fetch(webhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ meetingId: firefliesId }),
+            });
+
+            if (response.ok) {
+                setToast({ message: 'Análise da IA reenviada! Aguarde alguns segundos e atualize.', type: 'success' });
+                setTimeout(() => fetchMeetings(), 8000);
+            } else {
+                const data = await response.json();
+                setToast({ message: data.error || 'Erro ao reprocessar.', type: 'error' });
+            }
+        } catch (err) {
+            setToast({ message: 'Erro de conexão: ' + err.message, type: 'error' });
+        }
+        setReprocessing(null);
     }
 
     const getBadgeColor = (type) => {
@@ -219,14 +264,24 @@ export default function Dashboard() {
                                 onClick={() => navigate(`/reuniao/${m.id}`)}
                             >
                                 <div className="flex justify-between items-start mb-2">
-                                    <h3 className="text-lg font-bold text-gray-900">{m.title}</h3>
-                                    <button
-                                        onClick={(e) => handleDeleteClick(e, m.id, m.title)}
-                                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition"
-                                        title="Excluir reunião"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
+                                    <h3 className="text-lg font-bold text-gray-900 pr-2">{m.title}</h3>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                        <button
+                                            onClick={(e) => handleReprocess(e, m)}
+                                            disabled={reprocessing === m.id}
+                                            className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition disabled:opacity-50"
+                                            title="Refazer análise da IA"
+                                        >
+                                            <RefreshCw className={`w-4 h-4 ${reprocessing === m.id ? 'animate-spin' : ''}`} />
+                                        </button>
+                                        <button
+                                            onClick={(e) => handleDeleteClick(e, m.id, m.title)}
+                                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition"
+                                            title="Excluir reunião"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div className="flex items-center text-sm text-gray-500 mb-3 space-x-2">

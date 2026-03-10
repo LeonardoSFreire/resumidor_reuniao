@@ -89,7 +89,9 @@ async function processMeeting(firefliesId, userId, openAiKey, firefliesApiKey) {
       p_decisions: null,
       p_action_items: null,
       p_transcript: null,
-      p_status: 'processing'
+      p_status: 'processing',
+      p_productivity_score: null,
+      p_productivity_reason: null
     });
 
   if (insertError) {
@@ -114,7 +116,9 @@ async function processMeeting(firefliesId, userId, openAiKey, firefliesApiKey) {
       p_decisions: analysis.decisoes,
       p_action_items: analysis.itens_acao,
       p_transcript: transcriptData.sentences,
-      p_status: 'completed'
+      p_status: 'completed',
+      p_productivity_score: analysis.aproveitamento_nota,
+      p_productivity_reason: analysis.aproveitamento_motivo
     });
 
     console.log(`Reunião ${firefliesId} processada com sucesso!`);
@@ -133,7 +137,9 @@ async function processMeeting(firefliesId, userId, openAiKey, firefliesApiKey) {
         p_decisions: null,
         p_action_items: null,
         p_transcript: null,
-        p_status: 'error'
+        p_status: 'error',
+        p_productivity_score: null,
+        p_productivity_reason: null
       });
     }
   }

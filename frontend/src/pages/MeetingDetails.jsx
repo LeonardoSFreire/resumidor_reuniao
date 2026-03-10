@@ -87,6 +87,32 @@ export default function MeetingDetails() {
                         </ul>
                     </div>
 
+                    {meeting.productivity_score != null && (
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+                            <h3 className="text-sm font-bold text-gray-900 mb-3">Aproveitamento da Reunião</h3>
+                            <div className="flex items-center gap-4 mb-3">
+                                <div className="flex-1 bg-gray-200 rounded-full h-3 overflow-hidden">
+                                    <div
+                                        className={`h-full rounded-full transition-all duration-500 ${
+                                            meeting.productivity_score >= 7 ? 'bg-green-500' :
+                                            meeting.productivity_score >= 4 ? 'bg-yellow-500' : 'bg-red-500'
+                                        }`}
+                                        style={{ width: `${(meeting.productivity_score / 10) * 100}%` }}
+                                    />
+                                </div>
+                                <span className={`text-lg font-bold ${
+                                    meeting.productivity_score >= 7 ? 'text-green-600' :
+                                    meeting.productivity_score >= 4 ? 'text-yellow-600' : 'text-red-600'
+                                }`}>
+                                    {meeting.productivity_score}/10
+                                </span>
+                            </div>
+                            {meeting.productivity_reason && (
+                                <p className="text-gray-600 text-sm leading-relaxed">{meeting.productivity_reason}</p>
+                            )}
+                        </div>
+                    )}
+
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
                         <h3 className="text-sm font-bold text-gray-900 mb-3">Itens de Ação</h3>
                         <ul className="space-y-3">

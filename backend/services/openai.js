@@ -17,24 +17,29 @@ async function analyzeTranscript(transcriptText, openAiKey) {
     "objetivo": "string", // O objetivo principal desta reunião
     "resumo_executivo": "string", // Um resumo conciso da reunião (2 a 3 parágrafos)
     "decisoes": "string", // Tópicos e decisões importantes tomadas (formato Markdown bullet points)
-    "itens_acao": ["string"] // Array de strings. Cada item é uma tarefa definida para alguém fazer.
+    "itens_acao": ["string"], // Array de strings. Cada item é uma tarefa definida para alguém fazer.
+    "aproveitamento_nota": number, // Nota de 0 a 10 avaliando o quão proveitosa foi a reunião
+    "aproveitamento_motivo": "string" // Justificativa da nota, explicando por que a reunião foi ou não produtiva
   }
   `;
 
-    // Limite de prompt. Se usar o gpt-4o-mini, aguenta 128k tokens, o que é ótimo para reuniões grandes.
     try {
-        const response = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
-            temperature: 0.2, // Baixa temperatura para fatos precisos
-            messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: `Aqui está a transcrição completa:\n\n${transcriptText}` }
-            ],
-            response_format: { type: "json_object" }
+        const response = await openai.responses.create({
+            model: 'gpt-5-mini',
+            instructions: systemPrompt,
+            input: `Aqui está a transcrição completa:\n\n${transcriptText}`,
+            text: {
+                format: {
+                    type: 'json_object'
+                }
+            },
+            reasoning: {
+                effort: 'low'
+            },
+            store: false
         });
 
-        const completion = response.choices[0].message.content;
-        const parsedData = JSON.parse(completion);
+        const parsedData = JSON.parse(response.output_text);
         return parsedData;
 
     } catch (error) {
