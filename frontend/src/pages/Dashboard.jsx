@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Search, Calendar as CalendarIcon, ChevronDown, Clock, Send, Loader2, Trash2, RefreshCw, X } from 'lucide-react';
+import { Search, Calendar as CalendarIcon, ChevronDown, Clock, Send, Loader2, Trash2, RefreshCw, X, Pencil, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -18,6 +18,8 @@ export default function Dashboard() {
     const [toast, setToast] = useState(null);
     const [deleteModal, setDeleteModal] = useState(null);
     const [reprocessing, setReprocessing] = useState(null);
+    const [editingTitle, setEditingTitle] = useState(null);
+    const [editTitleValue, setEditTitleValue] = useState('');
     const navigate = useNavigate();
 
     // Filtros
@@ -153,6 +155,34 @@ export default function Dashboard() {
         } else {
             setToast({ message: 'Erro ao excluir: ' + error.message, type: 'error' });
         }
+    }
+
+    function handleTitleClick(e, meeting) {
+        e.stopPropagation();
+        setEditingTitle(meeting.id);
+        setEditTitleValue(meeting.title);
+    }
+
+    async function handleTitleSave(e, meetingId) {
+        e.stopPropagation();
+        const newTitle = editTitleValue.trim();
+        if (!newTitle) {
+            setEditingTitle(null);
+            return;
+        }
+
+        const { error } = await supabase
+            .from('meetings')
+            .update({ title: newTitle })
+            .eq('id', meetingId);
+
+        if (!error) {
+            setMeetings(prev => prev.map(m => m.id === meetingId ? { ...m, title: newTitle } : m));
+            setToast({ message: 'Título atualizado!', type: 'success' });
+        } else {
+            setToast({ message: 'Erro ao salvar título.', type: 'error' });
+        }
+        setEditingTitle(null);
     }
 
     async function handleReprocess(e, meeting) {
@@ -406,7 +436,43 @@ export default function Dashboard() {
                                 onClick={() => navigate(`/reuniao/${m.id}`)}
                             >
                                 <div className="flex justify-between items-start mb-2">
-                                    <h3 className="text-lg font-bold text-gray-900 pr-2">{m.title}</h3>
+                                    {editingTitle === m.id ? (
+                                        <div className="flex items-center gap-2 flex-1 pr-2" onClick={e => e.stopPropagation()}>
+                                            <input
+                                                type="text"
+                                                value={editTitleValue}
+                                                onChange={(e) => setEditTitleValue(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') handleTitleSave(e, m.id);
+                                                    if (e.key === 'Escape') setEditingTitle(null);
+                                                }}
+                                                autoFocus
+                                                className="flex-1 px-2 py-1 text-lg font-bold text-gray-900 border border-blue-400 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                            />
+                                            <button
+                                                onClick={(e) => handleTitleSave(e, m.id)}
+                                                className="p-1.5 rounded-lg text-green-600 hover:bg-green-50 transition"
+                                                title="Salvar"
+                                            >
+                                                <Check className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); setEditingTitle(null); }}
+                                                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition"
+                                                title="Cancelar"
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <h3
+                                            className="text-lg font-bold text-gray-900 pr-2 cursor-pointer hover:text-blue-600 transition"
+                                            onClick={(e) => handleTitleClick(e, m)}
+                                            title="Clique para editar o título"
+                                        >
+                                            {m.title}
+                                        </h3>
+                                    )}
                                     <div className="flex items-center gap-1 shrink-0">
                                         <button
                                             onClick={(e) => handleReprocess(e, m)}
