@@ -208,6 +208,40 @@ BEGIN
 END;
 $$;
 
+-- 8. RPC: get_meeting_for_reprocess
+-- ============================================================
+-- Usada pelo backend para buscar reunião com transcrição salva
+-- para reprocessar a análise da IA sem chamar o Fireflies.
+
+DROP FUNCTION IF EXISTS public.get_meeting_for_reprocess;
+
+CREATE OR REPLACE FUNCTION public.get_meeting_for_reprocess(p_meeting_id UUID, p_user_id UUID)
+RETURNS TABLE(
+  id UUID,
+  fireflies_id TEXT,
+  title TEXT,
+  date TIMESTAMPTZ,
+  duration INTEGER,
+  transcript JSONB
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    m.id,
+    m.fireflies_id,
+    m.title,
+    m.date,
+    m.duration,
+    m.transcript
+  FROM public.meetings m
+  WHERE m.id = p_meeting_id AND m.user_id = p_user_id;
+END;
+$$;
+
 -- ============================================================
 -- FIM DO SCHEMA
 -- ============================================================
@@ -215,7 +249,7 @@ $$;
 -- RESUMO:
 --   Tabelas:   profiles, meetings
 --   Triggers:  on_auth_user_created → handle_new_user()
---   RPCs:      get_profile_by_webhook_secret, process_webhook_meeting
+--   RPCs:      get_profile_by_webhook_secret, process_webhook_meeting, get_meeting_for_reprocess
 --   RLS:       Habilitado em ambas as tabelas
 --   Políticas: Usuário só acessa seus próprios dados
 --

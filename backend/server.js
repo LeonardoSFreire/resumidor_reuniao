@@ -145,6 +145,119 @@ async function processMeeting(firefliesId, userId, openAiKey, firefliesApiKey) {
   }
 }
 
+// Endpoint para reprocessar análise usando transcrição já salva no banco
+app.post('/api/meetings/:meetingId/reprocess', async (req, res) => {
+  const { meetingId } = req.params;
+  const { user_secret } = req.body;
+
+  if (!user_secret) {
+    return res.status(400).json({ error: 'user_secret é obrigatório' });
+  }
+
+  try {
+    // 1. Validar usuário pelo webhook secret
+    const { data: profile, error: profileError } = await supabase
+      .rpc('get_profile_by_webhook_secret', { p_secret: user_secret });
+
+    if (profileError || !profile || profile.length === 0) {
+      return res.status(401).json({ error: 'Secret inválido ou usuário não encontrado.' });
+    }
+
+    const { id: userId, openai_api_key } = profile[0];
+
+    if (!openai_api_key) {
+      return res.status(400).json({ error: 'OpenAI API Key não configurada.' });
+    }
+
+    // 2. Buscar reunião do banco (com transcrição já salva)
+    const { data: meeting, error: meetingError } = await supabase
+      .rpc('get_meeting_for_reprocess', { p_meeting_id: meetingId, p_user_id: userId });
+
+    if (meetingError || !meeting || meeting.length === 0) {
+      return res.status(404).json({ error: 'Reunião não encontrada ou sem permissão.' });
+    }
+
+    const meetingData = meeting[0];
+
+    if (!meetingData.transcript || meetingData.transcript.length === 0) {
+      return res.status(400).json({ error: 'Transcrição não encontrada no banco. Tente reprocessar pelo webhook.' });
+    }
+
+    res.status(202).json({ message: 'Reprocessamento iniciado.' });
+
+    // 3. Reconstruir texto da transcrição a partir das sentences salvas
+    const transcriptText = meetingData.transcript
+      .map(s => `${s.speaker_name}: ${s.text}`)
+      .join('\n');
+
+    // 4. Atualizar status para processing
+    await supabase.rpc('process_webhook_meeting', {
+      p_user_id: userId,
+      p_fireflies_id: meetingData.fireflies_id,
+      p_title: meetingData.title,
+      p_date: meetingData.date,
+      p_duration: meetingData.duration,
+      p_meeting_type: null,
+      p_objective: null,
+      p_executive_summary: null,
+      p_decisions: null,
+      p_action_items: null,
+      p_transcript: meetingData.transcript,
+      p_status: 'processing',
+      p_productivity_score: null,
+      p_productivity_reason: null
+    });
+
+    try {
+      // 5. Analisar com OpenAI
+      const analysis = await analyzeTranscript(transcriptText, openai_api_key);
+
+      // 6. Atualizar com resultado
+      await supabase.rpc('process_webhook_meeting', {
+        p_user_id: userId,
+        p_fireflies_id: meetingData.fireflies_id,
+        p_title: analysis.titulo || meetingData.title,
+        p_date: meetingData.date,
+        p_duration: meetingData.duration,
+        p_meeting_type: analysis.tipo_reuniao,
+        p_objective: analysis.objetivo,
+        p_executive_summary: analysis.resumo_executivo,
+        p_decisions: analysis.decisoes,
+        p_action_items: analysis.itens_acao,
+        p_transcript: meetingData.transcript,
+        p_status: 'completed',
+        p_productivity_score: analysis.aproveitamento_nota,
+        p_productivity_reason: analysis.aproveitamento_motivo
+      });
+
+      console.log(`Reunião ${meetingId} reprocessada com sucesso (do banco)!`);
+    } catch (error) {
+      console.error(`Falha ao reprocessar reunião ${meetingId}:`, error);
+      await supabase.rpc('process_webhook_meeting', {
+        p_user_id: userId,
+        p_fireflies_id: meetingData.fireflies_id,
+        p_title: meetingData.title,
+        p_date: meetingData.date,
+        p_duration: meetingData.duration,
+        p_meeting_type: null,
+        p_objective: null,
+        p_executive_summary: null,
+        p_decisions: null,
+        p_action_items: null,
+        p_transcript: meetingData.transcript,
+        p_status: 'error',
+        p_productivity_score: null,
+        p_productivity_reason: null
+      });
+    }
+  } catch (error) {
+    console.error('Erro no reprocess:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Erro interno ao reprocessar.' });
+    }
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Backend rodando na porta ${PORT}`);

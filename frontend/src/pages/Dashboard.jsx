@@ -159,12 +159,6 @@ export default function Dashboard() {
         e.stopPropagation();
         if (reprocessing) return;
 
-        const firefliesId = meeting.fireflies_id;
-        if (!firefliesId) {
-            setToast({ message: 'Esta reunião não possui ID do Fireflies para reprocessar.', type: 'error' });
-            return;
-        }
-
         setReprocessing(meeting.id);
         try {
             const { data: profile, error: profileError } = await supabase
@@ -179,11 +173,10 @@ export default function Dashboard() {
                 return;
             }
 
-            const webhookUrl = `${backendUrl}/api/webhooks/fireflies/${profile.fireflies_webhook_secret}`;
-            const response = await fetch(webhookUrl, {
+            const response = await fetch(`${backendUrl}/api/meetings/${meeting.id}/reprocess`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ meetingId: firefliesId }),
+                body: JSON.stringify({ user_secret: profile.fireflies_webhook_secret }),
             });
 
             if (response.ok) {
