@@ -31,6 +31,18 @@ export default function MeetingDetails() {
         fetchMeeting();
     }, [id]);
 
+    function formatActionItem(item) {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object') {
+            const tarefa = item.tarefa || '';
+            const resp = item.responsavel && item.responsavel !== 'A definir' ? item.responsavel : null;
+            const prazo = item.prazo && item.prazo !== 'A definir' ? item.prazo : null;
+            const extras = [resp, prazo].filter(Boolean).join(' • ');
+            return extras ? `${tarefa} _(${extras})_` : tarefa;
+        }
+        return '';
+    }
+
     function buildShareText() {
         if (!meeting) return '';
         const dateStr = meeting.date ? format(parseISO(meeting.date), "d 'de' MMMM 'de' yyyy", { locale: ptBR }) : '';
@@ -53,6 +65,12 @@ export default function MeetingDetails() {
             lines.push('');
         }
 
+        if (Array.isArray(meeting.topics_discussed) && meeting.topics_discussed.length > 0) {
+            lines.push('💬 *Tópicos Discutidos*');
+            meeting.topics_discussed.forEach(t => lines.push(`• ${t}`));
+            lines.push('');
+        }
+
         if (meeting.decisions) {
             lines.push('✅ *Decisões-Chave*');
             lines.push(meeting.decisions);
@@ -62,8 +80,14 @@ export default function MeetingDetails() {
         if (meeting.action_items && Array.isArray(meeting.action_items) && meeting.action_items.length > 0) {
             lines.push('📌 *Itens de Ação*');
             meeting.action_items.forEach((item, i) => {
-                lines.push(`${i + 1}. ${item}`);
+                lines.push(`${i + 1}. ${formatActionItem(item)}`);
             });
+            lines.push('');
+        }
+
+        if (Array.isArray(meeting.pendencies) && meeting.pendencies.length > 0) {
+            lines.push('⏳ *Pendências / Bloqueios*');
+            meeting.pendencies.forEach(p => lines.push(`• ${p}`));
             lines.push('');
         }
 
@@ -174,6 +198,35 @@ export default function MeetingDetails() {
         // Resumo Executivo
         addSection('Resumo Executivo', meeting.executive_summary);
 
+        // Tópicos Discutidos
+        if (Array.isArray(meeting.topics_discussed) && meeting.topics_discussed.length > 0) {
+            checkPageBreak(30);
+            doc.setFillColor(...blue);
+            doc.rect(margin, y, 3, 8, 'F');
+            doc.setTextColor(...darkBlue);
+            doc.setFontSize(13);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Topicos Discutidos', margin + 6, y + 6);
+            y += 14;
+
+            meeting.topics_discussed.forEach(topic => {
+                checkPageBreak(8);
+                doc.setFillColor(...blue);
+                doc.circle(margin + 8, y - 1, 1.5, 'F');
+                doc.setTextColor(55, 65, 81);
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'normal');
+                const lines = doc.splitTextToSize(topic, contentWidth - 16);
+                lines.forEach(line => {
+                    checkPageBreak(6);
+                    doc.text(line, margin + 12, y);
+                    y += 5;
+                });
+                y += 2;
+            });
+            y += 4;
+        }
+
         // Decisões-Chave
         if (meeting.decisions) {
             checkPageBreak(30);
@@ -265,17 +318,62 @@ export default function MeetingDetails() {
                 doc.setLineWidth(0.3);
                 doc.rect(margin + 6, y - 3, 4, 4);
 
-                // Número + texto
+                const isObj = item && typeof item === 'object';
+                const tarefaText = isObj ? (item.tarefa || '') : String(item);
+
+                // Texto da tarefa
                 doc.setTextColor(55, 65, 81);
                 doc.setFontSize(10);
                 doc.setFont('helvetica', 'normal');
-                const lines = doc.splitTextToSize(item, contentWidth - 18);
-                lines.forEach((line, i) => {
+                const lines = doc.splitTextToSize(tarefaText, contentWidth - 18);
+                lines.forEach(line => {
                     checkPageBreak(6);
                     doc.text(line, margin + 13, y);
                     y += 5;
                 });
+
+                // Responsável + prazo em cinza menor
+                if (isObj) {
+                    const resp = item.responsavel || 'A definir';
+                    const prazo = item.prazo || 'A definir';
+                    const metaText = `Responsavel: ${resp}  •  Prazo: ${prazo}`;
+                    doc.setTextColor(...gray);
+                    doc.setFontSize(8);
+                    doc.setFont('helvetica', 'italic');
+                    checkPageBreak(5);
+                    doc.text(metaText, margin + 13, y);
+                    y += 4;
+                }
                 y += 3;
+            });
+            y += 4;
+        }
+
+        // Pendências
+        if (Array.isArray(meeting.pendencies) && meeting.pendencies.length > 0) {
+            checkPageBreak(30);
+            doc.setFillColor(...blue);
+            doc.rect(margin, y, 3, 8, 'F');
+            doc.setTextColor(...darkBlue);
+            doc.setFontSize(13);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Pendencias / Bloqueios', margin + 6, y + 6);
+            y += 14;
+
+            meeting.pendencies.forEach(pend => {
+                checkPageBreak(8);
+                doc.setFillColor(...yellow);
+                doc.circle(margin + 8, y - 1, 1.5, 'F');
+                doc.setTextColor(55, 65, 81);
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'normal');
+                const lines = doc.splitTextToSize(pend, contentWidth - 16);
+                lines.forEach(line => {
+                    checkPageBreak(6);
+                    doc.text(line, margin + 12, y);
+                    y += 5;
+                });
+                y += 2;
             });
             y += 4;
         }
@@ -371,6 +469,20 @@ export default function MeetingDetails() {
                         <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-line">{meeting.executive_summary || 'Não disponível'}</p>
                     </div>
 
+                    {Array.isArray(meeting.topics_discussed) && meeting.topics_discussed.length > 0 && (
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+                            <h3 className="text-sm font-bold text-gray-900 mb-3">Tópicos Discutidos</h3>
+                            <ul className="space-y-2">
+                                {meeting.topics_discussed.map((t, idx) => (
+                                    <li key={idx} className="flex items-start space-x-2">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-2 shrink-0" />
+                                        <span className="text-gray-700 text-sm leading-relaxed">{t}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
                         <h3 className="text-sm font-bold text-gray-900 mb-3">Decisões-Chave</h3>
                         <ul className="space-y-2">
@@ -406,21 +518,81 @@ export default function MeetingDetails() {
                             {meeting.productivity_reason && (
                                 <p className="text-gray-600 text-sm leading-relaxed">{meeting.productivity_reason}</p>
                             )}
+                            {meeting.productivity_criteria && typeof meeting.productivity_criteria === 'object' && (
+                                <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    {Object.entries({
+                                        objetivos_claros: 'Objetivos claros',
+                                        decisoes_tomadas: 'Decisões tomadas',
+                                        responsaveis_definidos: 'Responsáveis definidos',
+                                        prazos_definidos: 'Prazos definidos',
+                                        foco_mantido: 'Foco mantido'
+                                    }).map(([key, label]) => {
+                                        const val = meeting.productivity_criteria[key];
+                                        if (val === undefined) return null;
+                                        return (
+                                            <div key={key} className="flex items-center gap-2 text-xs">
+                                                <span className={val ? 'text-green-600' : 'text-gray-400'}>
+                                                    {val ? '✅' : '⬜'}
+                                                </span>
+                                                <span className={val ? 'text-gray-700' : 'text-gray-400'}>{label}</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     )}
 
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
                         <h3 className="text-sm font-bold text-gray-900 mb-3">Itens de Ação</h3>
                         <ul className="space-y-3">
-                            {meeting.action_items && Array.isArray(meeting.action_items) ?
-                                meeting.action_items.map((item, idx) => (
-                                    <li key={idx} className="flex items-start space-x-3">
-                                        <input type="checkbox" className="mt-1 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                                        <span className="text-gray-700 text-sm leading-relaxed leading-snug">{item}</span>
-                                    </li>
-                                )) : <p className="text-gray-500 text-sm">Não disponível</p>}
+                            {meeting.action_items && Array.isArray(meeting.action_items) && meeting.action_items.length > 0 ?
+                                meeting.action_items.map((item, idx) => {
+                                    const isObj = item && typeof item === 'object';
+                                    const tarefa = isObj ? (item.tarefa || '') : String(item);
+                                    const resp = isObj ? item.responsavel : null;
+                                    const prazo = isObj ? item.prazo : null;
+                                    return (
+                                        <li key={idx} className="flex items-start space-x-3">
+                                            <input type="checkbox" className="mt-1 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                            <div className="flex-1">
+                                                <span className="text-gray-700 text-sm leading-snug block">{tarefa}</span>
+                                                {(resp || prazo) && (
+                                                    <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-xs text-gray-500">
+                                                        {resp && (
+                                                            <span>
+                                                                <span className="font-medium">Responsável:</span>{' '}
+                                                                <span className={resp === 'A definir' ? 'italic text-gray-400' : ''}>{resp}</span>
+                                                            </span>
+                                                        )}
+                                                        {prazo && (
+                                                            <span>
+                                                                <span className="font-medium">Prazo:</span>{' '}
+                                                                <span className={prazo === 'A definir' ? 'italic text-gray-400' : ''}>{prazo}</span>
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </li>
+                                    );
+                                }) : <p className="text-gray-500 text-sm">Não disponível</p>}
                         </ul>
                     </div>
+
+                    {Array.isArray(meeting.pendencies) && meeting.pendencies.length > 0 && (
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+                            <h3 className="text-sm font-bold text-gray-900 mb-3">Pendências / Bloqueios</h3>
+                            <ul className="space-y-2">
+                                {meeting.pendencies.map((p, idx) => (
+                                    <li key={idx} className="flex items-start space-x-2">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 mt-2 shrink-0" />
+                                        <span className="text-gray-700 text-sm leading-relaxed">{p}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
                 </div>
 
                 {/* Right Column: Full Transcript */}

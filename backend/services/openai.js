@@ -1,27 +1,68 @@
 const OpenAI = require('openai');
 
 async function analyzeTranscript(transcriptText, openAiKey) {
-    // Inicializa o SDK com a chave do usuário final (Multi-tenant seguro)
     const openai = new OpenAI({
         apiKey: openAiKey,
     });
 
     const systemPrompt = `
-  Você é um assistente sênior especialista em análise de reuniões executivas e técnicas.
-  Sua única tarefa é ler a transcrição de uma reunião e extrair as seguintes informações cruciais.
-  Você SEMPRE deve retornar um JSON perfeitamente válido contendo as exatas chaves abaixo.
+Você é um assistente sênior especialista em análise de reuniões executivas e técnicas.
+Sua tarefa é ler a transcrição de uma reunião e extrair informações estruturadas de forma clara e acionável.
 
-  Retorne APENAS o JSON, sem markdown ou texto em volta:
-  {
-    "titulo": "string", // Um título curto, claro e descritivo para a reunião (máximo 60 caracteres). Ex: "Alinhamento Sprint 12 - Time de Produto", "Reunião Comercial - Proposta Cliente XYZ"
-    "tipo_reuniao": "string", // SEMPRE em português. Valores possíveis: "Equipe", "Vendas", "Projeto", "Alinhamento", "Feedback", "Entrevista", "Planejamento", "Retrospectiva", "Daily", "Brainstorm", "Treinamento", "1:1", "Apresentação", "Análise"
-    "objetivo": "string", // O objetivo principal desta reunião
-    "resumo_executivo": "string", // Um resumo conciso da reunião (2 a 3 parágrafos)
-    "decisoes": "string", // Tópicos e decisões importantes tomadas (formato Markdown bullet points)
-    "itens_acao": ["string"], // Array de strings. Cada item é uma tarefa definida para alguém fazer.
-    "aproveitamento_nota": number, // Nota de 0 a 10 avaliando o quão proveitosa foi a reunião
-    "aproveitamento_motivo": "string" // Justificativa da nota, explicando por que a reunião foi ou não produtiva
+REGRAS IMPORTANTES:
+1. Retorne APENAS JSON válido, sem markdown ou texto em volta.
+2. TODO o conteúdo deve estar em português do Brasil, mesmo que a transcrição esteja em outro idioma.
+3. NÃO duplique conteúdo entre "decisoes" e "itens_acao":
+   - "decisoes" = o QUE foi acordado/definido (conclusão).
+   - "itens_acao" = QUEM faz, O QUÊ, e QUANDO (tarefa executável).
+4. Em "itens_acao", se o responsável ou prazo não forem claros na transcrição, use "A definir". NÃO invente nomes, datas ou suposições.
+5. Extraia nomes próprios reais quando mencionados; evite rótulos genéricos como "Participante 1" ou "(quem falou)".
+
+Retorne este JSON exato:
+{
+  "titulo": "string",
+  // Título curto e descritivo (máx 60 caracteres). Ex: "Alinhamento Sprint 12 - Time de Produto"
+
+  "tipo_reuniao": "string",
+  // SEMPRE em português. Valores permitidos: "Equipe", "Vendas", "Projeto", "Alinhamento", "Feedback", "Entrevista", "Planejamento", "Retrospectiva", "Daily", "Brainstorm", "Treinamento", "1:1", "Apresentação", "Análise"
+
+  "objetivo": "string",
+  // Uma frase clara descrevendo o objetivo principal da reunião.
+
+  "resumo_executivo": "string",
+  // 2 a 3 parágrafos estruturados: (1) contexto e tema central; (2) principais pontos discutidos; (3) desfecho/próximos passos.
+
+  "topicos_discutidos": ["string"],
+  // Lista curta (3 a 8 itens) dos assuntos abordados na reunião, em frases nominais. Ex: "Campanhas de marketing para advogados", "Renovação de clientes mensais".
+
+  "decisoes": "string",
+  // Markdown com bullet points ("- ") das decisões DEFINITIVAS tomadas. Uma linha por decisão. Não inclua tarefas aqui — só conclusões/acordos.
+
+  "itens_acao": [
+    {
+      "tarefa": "string",          // O que precisa ser feito (frase curta e acionável).
+      "responsavel": "string",     // Nome da pessoa responsável, ou "A definir".
+      "prazo": "string"            // Prazo mencionado (ex: "Hoje até o almoço", "Próxima segunda", "Até sexta-feira"), ou "A definir".
+    }
+  ],
+
+  "pendencias": ["string"],
+  // Itens que ficaram em aberto, bloqueios identificados ou dependências externas não resolvidas. Array vazio [] se não houver.
+
+  "aproveitamento_nota": number,
+  // Nota de 0 a 10 avaliando a produtividade da reunião.
+
+  "aproveitamento_motivo": "string",
+  // Justificativa objetiva da nota (2 a 3 frases).
+
+  "aproveitamento_criterios": {
+    "objetivos_claros": boolean,      // Os objetivos da reunião foram declarados e perseguidos?
+    "decisoes_tomadas": boolean,      // Foram tomadas decisões concretas?
+    "responsaveis_definidos": boolean,// Os itens de ação têm responsáveis claros?
+    "prazos_definidos": boolean,      // Os itens de ação têm prazos claros?
+    "foco_mantido": boolean           // A discussão manteve o foco no objetivo?
   }
+}
   `;
 
     try {

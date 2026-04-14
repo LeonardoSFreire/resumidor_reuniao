@@ -42,6 +42,9 @@ CREATE TABLE IF NOT EXISTS public.meetings (
   status TEXT NOT NULL DEFAULT 'processing',
   productivity_score INTEGER,
   productivity_reason TEXT,
+  topics_discussed JSONB,
+  pendencies JSONB,
+  productivity_criteria JSONB,
   created_at TIMESTAMPTZ DEFAULT NOW(),
 
   CONSTRAINT unique_fireflies_id UNIQUE (fireflies_id)
@@ -167,7 +170,10 @@ CREATE OR REPLACE FUNCTION public.process_webhook_meeting(
   p_transcript JSONB DEFAULT NULL,
   p_status TEXT DEFAULT 'processing',
   p_productivity_score INTEGER DEFAULT NULL,
-  p_productivity_reason TEXT DEFAULT NULL
+  p_productivity_reason TEXT DEFAULT NULL,
+  p_topics_discussed JSONB DEFAULT NULL,
+  p_pendencies JSONB DEFAULT NULL,
+  p_productivity_criteria JSONB DEFAULT NULL
 )
 RETURNS UUID
 LANGUAGE plpgsql
@@ -181,13 +187,15 @@ BEGIN
     user_id, fireflies_id, title, date, duration,
     meeting_type, objective, executive_summary, decisions,
     action_items, transcript, status,
-    productivity_score, productivity_reason
+    productivity_score, productivity_reason,
+    topics_discussed, pendencies, productivity_criteria
   )
   VALUES (
     p_user_id, p_fireflies_id, p_title, p_date, p_duration,
     p_meeting_type, p_objective, p_executive_summary, p_decisions,
     p_action_items, p_transcript, p_status,
-    p_productivity_score, p_productivity_reason
+    p_productivity_score, p_productivity_reason,
+    p_topics_discussed, p_pendencies, p_productivity_criteria
   )
   ON CONFLICT (fireflies_id) DO UPDATE SET
     title = EXCLUDED.title,
@@ -201,7 +209,10 @@ BEGIN
     transcript = EXCLUDED.transcript,
     status = EXCLUDED.status,
     productivity_score = EXCLUDED.productivity_score,
-    productivity_reason = EXCLUDED.productivity_reason
+    productivity_reason = EXCLUDED.productivity_reason,
+    topics_discussed = EXCLUDED.topics_discussed,
+    pendencies = EXCLUDED.pendencies,
+    productivity_criteria = EXCLUDED.productivity_criteria
   RETURNING id INTO v_meeting_id;
 
   RETURN v_meeting_id;

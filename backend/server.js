@@ -118,7 +118,10 @@ async function processMeeting(firefliesId, userId, openAiKey, firefliesApiKey) {
       p_transcript: transcriptData.sentences,
       p_status: 'completed',
       p_productivity_score: analysis.aproveitamento_nota,
-      p_productivity_reason: analysis.aproveitamento_motivo
+      p_productivity_reason: analysis.aproveitamento_motivo,
+      p_topics_discussed: analysis.topicos_discutidos || null,
+      p_pendencies: analysis.pendencias || null,
+      p_productivity_criteria: analysis.aproveitamento_criterios || null
     });
 
     console.log(`Reunião ${firefliesId} processada com sucesso!`);
@@ -227,7 +230,10 @@ app.post('/api/meetings/:meetingId/reprocess', async (req, res) => {
         p_transcript: meetingData.transcript,
         p_status: 'completed',
         p_productivity_score: analysis.aproveitamento_nota,
-        p_productivity_reason: analysis.aproveitamento_motivo
+        p_productivity_reason: analysis.aproveitamento_motivo,
+        p_topics_discussed: analysis.topicos_discutidos || null,
+        p_pendencies: analysis.pendencias || null,
+        p_productivity_criteria: analysis.aproveitamento_criterios || null
       });
 
       console.log(`Reunião ${meetingId} reprocessada com sucesso (do banco)!`);
