@@ -105,7 +105,7 @@ export default function MeetingDetails() {
         const text = buildShareText();
 
         if (navigator.share) {
-            navigator.share({ title: meeting.title, text }).catch(() => {});
+            navigator.share({ text }).catch(() => {});
         } else {
             const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
             window.open(whatsappUrl, '_blank');
